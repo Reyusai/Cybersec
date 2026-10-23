@@ -1,0 +1,183 @@
+# Password Strength Checker: A Flask-Based Educational Web Application
+
+## Abstract
+
+Weak passwords remain one of the most common causes of account compromise.
+This project builds a small web application that estimates password strength
+and explains the result in plain language. The user types a password into a
+single-page form. The server scores it from 0 to 100 using transparent rules
+(length, character variety, unique characters, and penalties for repeats,
+sequences and common passwords) and returns a rating from Very Weak to Very
+Strong with specific advice. The password is processed in memory only and is
+never stored, logged or transmitted. The project is written in one Python file
+using Flask and uses no JavaScript, database or external service. It is an
+educational estimate, not a security guarantee.
+
+## Objectives
+
+1. Build a simple single-page website using Python and Flask.
+2. Apply clear, explainable rules to evaluate password strength.
+3. Give users understandable feedback on how to improve a password.
+4. Demonstrate privacy-conscious handling of sensitive input.
+5. Keep the code short enough for a beginner to read and present.
+
+## Tools and Technologies
+
+| Tool | Use |
+|------|-----|
+| Python 3.9+ | Programming language |
+| Flask 3.x | Web framework (routing, form handling, templating) |
+| Jinja2 (included with Flask) | Inline HTML template with automatic escaping |
+| HTML and CSS | Page structure and responsive styling (inline, no JavaScript) |
+| Web browser | Used to open the website |
+
+## Requirements
+
+**Functional**
+- Show a form where a password can be entered and submitted.
+- Show a rating, a numeric score, a visual bar and feedback.
+- Show a score breakdown so the user sees why they got the score.
+- Handle empty or too-long input with a clear message.
+
+**Non-functional**
+- The password must not be saved, logged, transmitted or stored.
+- No JavaScript, analytics, database or external services.
+- Responsive layout that works on phones and desktops.
+- All Python code in one file (`app.py`).
+
+**Software requirements:** Python 3.9 or newer, Flask 3.x, and a modern browser.
+
+## System Design and Workflow
+
+```
+User opens page (GET /)
+        |
+        v
+Browser shows empty form
+        |
+User types password and presses "Check strength" (POST /)
+        |
+        v
+Server reads the password from the form
+        |
+        +-- empty or whitespace only?  -> show error message
+        +-- longer than 128 characters? -> show error message
+        |
+        v
+evaluate_password() calculates score, rating, tips and breakdown
+        |
+        v
+Page is rendered with the result (password is NOT included in the page)
+        |
+        v
+Password variable is discarded when the request ends
+```
+
+**Main components in `app.py`**
+- Settings and data: `MAX_LENGTH`, `COMMON_PASSWORDS`, `LEET_TABLE`, `SEQUENCES`.
+- Helper functions: `has_sequence`, `has_repeats`, `is_common_password`,
+  `contains_common_word`, `rating_for`.
+- Scoring function: `evaluate_password`.
+- Template: the `PAGE` string (HTML and CSS).
+- Route: `index()` handles GET and POST.
+- Safety headers: `add_safety_headers()` disables caching and blocks scripts
+  and outside content.
+
+## Implementation Summary
+
+### Scoring rules
+
+| Rule | Points |
+|------|--------|
+| Length | 2 per character, up to 20 characters (max 40) |
+| Lowercase letters present | +10 |
+| Uppercase letters present | +10 |
+| Digits present | +10 |
+| Symbols present (spaces count) | +10 |
+| Unique characters | 2 per different character, up to 10 (max 20) |
+| Contains a common password or word | -20 |
+| Same character 3+ times in a row | -10 |
+| Sequence such as abc, 123, qwe | -15 |
+| Only one character type | -10 |
+
+**Hard limits:** a password found on the common list cannot score above 10,
+and a password shorter than 8 characters cannot score above 35. The final score
+is kept between 0 and 100.
+
+### Rating bands
+
+| Score | Rating |
+|-------|--------|
+| 0-19 | Very Weak |
+| 20-39 | Weak |
+| 40-59 | Moderate |
+| 60-79 | Strong |
+| 80-100 | Very Strong |
+
+### Common-password detection
+
+The program lowercases the password and also converts look-alike symbols back
+to letters (for example `@` to `a`, `0` to `o`), so `P@ssw0rd` is recognised as
+`password`.
+
+### Privacy design
+
+- A POST form keeps the password out of the URL and browser history.
+- The password is never printed, logged, written to a file or put in the page.
+- The page sends `Cache-Control: no-store`.
+- A Content-Security-Policy header blocks scripts and external resources.
+- There is no database, analytics or network call.
+
+## Testing Examples
+
+| # | Input | Score | Rating | Why |
+|---|-------|-------|--------|-----|
+| 1 | (empty) | none | Error shown | Empty input is rejected |
+| 2 | `password` | 10 | Very Weak | On the common list, so capped at 10 |
+| 3 | `P@ssw0rd` | 10 | Very Weak | Becomes `password` after symbol conversion, capped at 10 |
+| 4 | `hello123` | 15 | Very Weak | Common word and a sequence penalty |
+| 5 | `abcdefgh` | 17 | Very Weak | Sequence, one character type |
+| 6 | `Ab1!` | 35 | Weak | Good variety but only 4 characters, capped at 35 |
+| 7 | `tiger2020` | 52 | Moderate | Two character types, 9 characters |
+| 8 | `Summer2024` | 66 | Strong | Three character types, 10 characters (see limitations) |
+| 9 | `Blue!Mountain#92` | 92 | Very Strong | 16 characters, all four types, many unique characters |
+| 10 | `Tr1cky-Horse-Battery-42` | 100 | Very Strong | Long, varied, no penalties |
+
+Tests are run by entering each example into the form and comparing the result
+with the table.
+
+## Limitations
+
+- The common-password list has only a few dozen entries; real attackers use
+  lists with millions.
+- The tool cannot detect predictable patterns such as names, dates, seasons
+  and years. `Summer2024` scores "Strong" even though attackers guess such
+  patterns easily.
+- Symbol conversion is simple and does not cover every substitution.
+- Sequence checking covers only a few alphabet and keyboard rows.
+- The score is a heuristic and does not model real cracking speed.
+- It does not check whether a password appeared in a data breach.
+- It cannot judge how or where the user will reuse the password.
+- Python cannot guarantee that a password is wiped from memory immediately,
+  and the local development server is not intended for public hosting.
+
+## Future Enhancements
+
+- Load a larger common-password list from a file.
+- Add an estimated crack-time calculation based on entropy.
+- Detect dates, names and keyboard patterns more intelligently.
+- Add a passphrase generator.
+- Check breach exposure using a privacy-preserving method such as k-anonymity
+  (this would require an external service and a privacy review).
+- Add automated unit tests with `pytest`.
+- Support multiple languages.
+
+## Conclusion
+
+The project shows how a few clear rules can estimate password strength and
+teach users what makes a password weak or strong. Flask keeps the website small
+and readable, and the privacy-focused design means the password is used only
+for the current response. Because the scoring is a simple heuristic, the result
+should be treated as guidance, not a guarantee. Real accounts should use long,
+unique passwords stored in a trusted password manager, with multi-factor
+authentication where available.
